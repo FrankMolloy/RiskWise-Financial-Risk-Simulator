@@ -1,1 +1,1 @@
-web: cd SRC && gunicorn app:app.server
+web: cd SRC && gunicorn app:server

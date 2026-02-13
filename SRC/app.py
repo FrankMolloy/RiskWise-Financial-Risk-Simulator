@@ -27,6 +27,7 @@ app = Dash(
 )
 app.title = "RiskWise"
 
+server = app.server
 
 def money(x: float) -> str:
     return f"£{x:,.0f}"
