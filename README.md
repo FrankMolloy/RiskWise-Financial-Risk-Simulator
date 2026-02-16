@@ -1,4 +1,4 @@
-🚀 RiskWise — Hackonomics Financial Risk Simulator
+🚀 RiskWise - Financial Risk Simulator
 
 Live Demo: https://riskwise-v04j.onrender.com
 
