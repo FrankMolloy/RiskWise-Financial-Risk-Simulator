@@ -72,5 +72,7 @@ Simplified stochastic assumptions.
 Author
 
 Frank Molloy
-GitHub: […](https://github.com/FrankMolloy)
+
+GitHub: https://github.com/FrankMolloy
+
 LinkedIn: http://www.linkedin.com/in/frankunderwoodmolloy
