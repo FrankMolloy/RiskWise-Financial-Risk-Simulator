@@ -1,216 +1,75 @@
-🚀 RiskWise - Financial Risk Simulator
+🚀 RiskWise – Monte Carlo Financial Risk Simulator
 
 Live Demo: https://riskwise-v04j.onrender.com
+Built for Hackonomics 2026
 
-GitHub: https://github.com/FrankMolloy/Hackonomics-Financial-Risk-Simulator
+What It Does
 
-📌 Overview
+RiskWise is a cloud-deployed financial risk simulator that models long-term investment outcomes under uncertainty.
 
-Most financial projections show a single number.
+Instead of showing a single forecast, it runs 2,000–5,000 Monte Carlo simulations per scenario to visualise a distribution of possible outcomes.
 
-Real life doesn’t work like that.
+It helps users:
 
-RiskWise is a cloud-deployed financial risk simulator that visualises uncertainty in long-term saving and investing. Instead of projecting a single forecast, it runs thousands of Monte Carlo simulations to model a distribution of possible futures.
+Understand downside and upside risk
 
-The objective is not to predict markets — but to teach probabilistic thinking and improve financial decision-making.
+Estimate probability of reaching financial goals
 
-Built for Hackonomics 2026, the project combines:
+Compare strategies under volatility
 
-Economics
+Why It Matters
 
-Financial literacy
+Traditional financial tools show one projected number.
 
-Quantitative modelling
+RiskWise demonstrates why that is misleading — by modelling volatility, tail risk, and sequence-of-returns effects using stochastic simulation.
 
-Software engineering
+The aim is educational: to promote probabilistic thinking in financial decision-making.
 
-Interactive product design
+Core Features
 
-🎯 Problem
-
-Traditional financial tools often:
-
-Show a single projected value
-
-Ignore volatility and tail risk
-
-Fail to explain uncertainty clearly
-
-Provide limited educational context
-
-This creates false confidence and weak financial planning decisions.
-
-RiskWise addresses this by:
-
-Quantifying uncertainty
-
-Showing downside and upside ranges
-
-Estimating probability of reaching a goal
-
-Translating technical outputs into plain-English insights
-
-🧠 Core Features
-📊 Monte Carlo Simulation Engine
-
-2,000–5,000 simulated wealth paths per scenario
-
-Geometric Brownian motion-style modelling
+Monte Carlo simulation engine (2,000–5,000 runs)
 
 Percentile bands (P10 / P50 / P90)
 
-Distribution-based final outcome analysis
+Goal probability modelling
 
-📈 Deterministic vs Monte Carlo Comparison
+Binary search solver for required monthly contribution
 
-Single “average” projection shown alongside distribution
+Stress testing (crash scenarios + fee drag)
 
-Demonstrates why one-line forecasts are misleading
+Interactive Dash + Plotly dashboard
 
-Highlights sequence-of-returns risk
+Save & compare financial plans
 
-🎯 Goal-Based Planning
-
-Probability of reaching financial targets
-
-Binary search optimisation to compute required monthly contribution
-
-Actionable plan recommendations
-
-📉 Realism Enhancements
-
-Historical market calibration (SPY / QQQ / IWM)
-
-Log-return volatility estimation (annualised, 252-day convention)
-
-Inflation-adjusted results (real purchasing power)
-
-Annual fee drag modelling
-
-Stress-test crash scenarios
-
-Sensitivity analysis (±1% return impact)
-
-🧾 My Plan System
-
-Save scenario snapshots
-
-Generate plain-English plan reports
-
-Export plan as JSON
-
-Compare strategies side-by-side
-
-📚 Educational Modules
-
-Learn & Method tab explaining modelling assumptions
-
-Interactive sequence-of-returns risk demo
-
-Financial literacy insights panel
-
-🔬 Methodology
-Return Modelling
-
-Expected returns and volatility can be:
-
-Preset (cautious / balanced / aggressive), or
-
-Calibrated from historical daily log returns (annualised over 252 trading days).
-
-Monte Carlo Engine
+Methodology (Brief Technical Summary)
 
 Simulates monthly returns using stochastic modelling
 
-Applies contributions and compounding
+Optional calibration from historical ETF log returns (annualised, 252-day convention)
 
-Adjusts for inflation (real terms)
+Inflation-adjusted (real terms) projections
 
-Computes percentile distributions and goal probability
+Percentile distribution analysis
 
-Goal Solver
+Tech Stack
 
-Uses binary search optimisation to determine the minimum monthly contribution required to reach a specified probability of success.
-
-Stress Testing
-
-Applies an educational crash shock to illustrate tail risk and downside exposure.
-
-🏗 Architecture
-User Input → Simulation Engine → Statistical Analysis → Visualisation Layer → Insight Generator → Plan Storage
-
-
-Core components:
-
-simulate() – Monte Carlo engine
-
-deterministic_forecast() – average-path comparison
-
-prob_reach_goal() – probability metric
-
-Binary search solver
-
-Dash multi-tab application with state management
-
-Persistent storage via dcc.Store
-
-🛠 Tech Stack
-
-Python
-
-Dash (frontend framework)
-
-Plotly (interactive graphs)
-
-NumPy (numerical computing)
-
-pandas (data analysis)
-
-Requests (market data retrieval)
-
-Gunicorn (WSGI server)
-
+Python, NumPy, pandas
+Dash + Plotly
+Gunicorn (WSGI)
 Render (cloud deployment)
+GitHub CI/CD
 
-Git & GitHub (version control + CI/CD)
+Architecture
 
-☁ Deployment
+User Input → Simulation Engine → Statistical Analysis → Visualisation → Insight Generation → Plan Storage
 
-The application is deployed on Render.
+Limitations
 
-WSGI entrypoint configured with Gunicorn
+Educational tool — not financial advice.
+Simplified stochastic assumptions.
 
-Continuous deployment enabled
-
-Push to main → automatic rebuild and redeploy
-
-📊 Example Use Cases
-
-Planning a house deposit
-
-Building an emergency fund
-
-Long-term retirement modelling
-
-Comparing cautious vs aggressive strategies
-
-Understanding impact of fees and volatility
-
-⚠ Limitations
-
-Educational tool — not financial advice
-
-Simplified stochastic assumptions
-
-Historical data does not guarantee future performance
-
-Stress test model is illustrative
-
-🧑‍💻 Author
+Author
 
 Frank Molloy
-Computer Science Student
-
-GitHub: https://github.com/FrankMolloy
-
-LinkedIn: www.linkedin.com/in/frankunderwoodmolloy
+GitHub: […](https://github.com/FrankMolloy)
+LinkedIn: http://www.linkedin.com/in/frankunderwoodmolloy
