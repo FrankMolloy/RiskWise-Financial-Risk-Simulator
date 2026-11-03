@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 from dash import Dash, dcc, html, Input, Output, State
+from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 import numpy as np
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 from simulator import simulate
+from planning import required_monthly
+from projections import apply_crash, deterministic_forecast
 from metrics import summarise, prob_reach_goal
 from market_data import fetch_stooq_close_prices, estimate_annual_return_vol
 
@@ -61,56 +64,6 @@ def pct_band(paths: np.ndarray):
     p50 = np.percentile(paths, 50, axis=0)
     p90 = np.percentile(paths, 90, axis=0)
     return p10, p50, p90
-
-
-def apply_crash(paths: np.ndarray, crash_pct: float, seed: int = 999) -> np.ndarray:
-    """Educational stress test: one crash month per path then multiply future balances by (1-crash_pct)."""
-    if crash_pct <= 0:
-        return paths
-
-    out = paths.copy()
-    rng = np.random.default_rng(seed)
-    n_sims, n_steps = out.shape
-
-    lo = min(12, n_steps - 2)
-    hi = max(lo + 1, n_steps - 12)
-    crash_months = rng.integers(low=lo, high=hi, size=n_sims)
-
-    factor = 1.0 - crash_pct
-    for i in range(n_sims):
-        m = int(crash_months[i])
-        out[i, m:] *= factor
-
-    return out
-
-
-def deterministic_forecast(
-    years: int,
-    start_balance: float,
-    monthly_contribution: float,
-    expected_return_annual: float,
-    inflation_annual: float,
-    fee_annual: float,
-) -> np.ndarray:
-    """
-    One-path deterministic projection using constant monthly growth.
-    Returns inflation-adjusted balances (real terms).
-    """
-    months = int(years * 12)
-    r_net_annual = expected_return_annual - fee_annual
-    r_m = (1.0 + r_net_annual) ** (1.0 / 12.0) - 1.0
-    infl_m = (1.0 + inflation_annual) ** (1.0 / 12.0) - 1.0
-
-    bal = start_balance
-    out = np.zeros(months + 1, dtype=float)
-    out[0] = bal
-
-    for t in range(1, months + 1):
-        bal = bal * (1.0 + r_m) + monthly_contribution
-        real = bal / ((1.0 + infl_m) ** t)
-        out[t] = real
-
-    return out
 
 
 def build_paths_figure(months, scenario_name, p10, p50, p90, det=None,
@@ -234,7 +187,7 @@ def build_hist_figure(final_a, scenario_a, median_a, goal, final_b=None, scenari
 
 
 def safe_now_str() -> str:
-    return datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
 
 # -------------------- UI Components --------------------
@@ -623,7 +576,7 @@ learn_tab = dbc.Container(fluid=True, className="pt-2", children=[
                 html.Hr(),
                 html.H5("1) What RiskWise is doing (high level)"),
                 html.Ul([
-                    html.Li("You choose assumptions (return, volatility, fees, inflation, horizon, contributions)."),
+                    html.Li("You choose a scenario, fees, horizon, contributions and optional calibration/stress settings. Inflation is fixed at 2%."),
                     html.Li("RiskWise generates thousands of plausible future paths using Monte Carlo simulation."),
                     html.Li("It summarises the distribution: median, 10th/90th percentiles, goal probability."),
                     html.Li("It also shows a deterministic projection (one ‘average’ path) so you can see why a single line is misleading."),
@@ -646,7 +599,7 @@ learn_tab = dbc.Container(fluid=True, className="pt-2", children=[
                 html.H5("3) Real market calibration (SPY / QQQ / IWM)"),
                 html.P(
                     "If enabled, RiskWise downloads historical prices and estimates annual return/volatility using log returns, "
-                    "then annualises the estimates. This gives a more data-driven baseline than a fixed preset.",
+                    "then annualises the estimates. These log-return estimates are used as an approximation in a normal simple-return model.",
                     className="text-muted"
                 ),
 
@@ -660,15 +613,15 @@ learn_tab = dbc.Container(fluid=True, className="pt-2", children=[
                 html.Hr(),
                 html.H5("5) Stress testing (crash scenario)"),
                 html.P(
-                    "The stress test applies a one-off crash to simulated paths. It’s simplified, but helps communicate downside "
-                    "risk and why investors need margin for error.",
+                    "The stress test multiplies all balances after a selected month by a haircut. "
+                    "It also reduces later contributions, so it is illustrative rather than a faithful one-month market crash.",
                     className="text-muted"
                 ),
 
                 html.Hr(),
                 html.H5("6) Deterministic vs Monte Carlo (why we show both)"),
                 html.Ul([
-                    html.Li("Deterministic forecast = one line, assumes the average happens smoothly."),
+                    html.Li("The deterministic line compounds an annual rate; the simulator divides its annual mean by 12. The line is not the simulator's expected value."),
                     html.Li("Monte Carlo = range of outcomes, shows dispersion and goal probability."),
                     html.Li("Seeing both helps users understand why ‘one number’ is not reality."),
                 ]),
@@ -676,8 +629,8 @@ learn_tab = dbc.Container(fluid=True, className="pt-2", children=[
                 html.Hr(),
                 html.H5("7) Goal planner (binary search solver)"),
                 html.P(
-                    "The solver searches for the minimum monthly contribution needed to reach your goal with a chosen probability "
-                    "(e.g. 75%). It uses binary search for speed and stability.",
+                    "The solver searches up to £5,000/month for a contribution meeting your target probability in a fixed 900-path sample. "
+                    "It uses binary search and rounds upward to £10. This is conditional on the model assumptions, not a guarantee.",
                     className="text-muted"
                 ),
 
@@ -1019,9 +972,9 @@ def update_dashboard(
 
     fee_line = f"Fees: {fees_pct:.2f}%/yr reduces expected growth; small % fees compound over time."
     infl_line = f"Inflation: results are shown in real terms (today’s money) using {INFLATION_ANNUAL*100:.1f}%/yr."
-    unc_line = f"Uncertainty: the 10th–90th band span is {money(spread_a)} (realistic spread, not a prediction)."
+    unc_line = f"Uncertainty: the 10th–90th band span is {money(spread_a)} (modelled spread, not a prediction)."
     crash_line = f"Stress test: {'ON' if crash_enabled else 'OFF'}" + (f" (crash {crash_sev:.0f}%)." if crash_enabled else ".")
-    calib_line = f"Calibration: {'real market data' if use_data else 'preset assumptions'}."
+    calib_line = f"Calibration: {data_note}."
 
     literacy = html.Ul([
         html.Li(fee_line),
@@ -1034,7 +987,7 @@ def update_dashboard(
     det_vs_mc = html.Div([
         html.P(f"Deterministic forecast (single average path): {money(det_end)}", className="mb-1"),
         html.P(f"Monte Carlo median (typical outcome): {money(summary_a['median'])}", className="mb-1"),
-        html.Small("Deterministic projections hide dispersion. Monte Carlo shows ranges and probability of success.", className="text-muted"),
+        html.Small("The deterministic line uses a compound annual rate; Monte Carlo divides the annual mean by 12. Their difference reflects both rate conventions and uncertainty.", className="text-muted"),
     ])
 
     if sens_enabled and goal and goal > 0:
@@ -1086,21 +1039,23 @@ def update_dashboard(
     Output("solver-result", "children"),
     Output("solver-store", "data"),
     Input("solve-btn", "n_clicks"),
-    State("scenario", "value"),
-    State("years", "value"),
-    State("goal", "value"),
-    State("target_prob", "value"),
-    State("use_real_data", "value"),
-    State("asset", "value"),
-    State("fees_pct", "value"),
-    State("crash_on", "value"),
-    State("crash_sev", "value"),
+    Input("scenario", "value"),
+    Input("years", "value"),
+    Input("goal", "value"),
+    Input("target_prob", "value"),
+    Input("use_real_data", "value"),
+    Input("asset", "value"),
+    Input("fees_pct", "value"),
+    Input("crash_on", "value"),
+    Input("crash_sev", "value"),
     prevent_initial_call=True
 )
 def solve_monthly(
     n_clicks, scenario, years, goal, target_prob,
     use_real_data, asset, fees_pct, crash_on, crash_sev
 ):
+    if not n_clicks:
+        return "Set your goal, then click Solve.", ""
     if not goal or goal <= 0:
         msg = "Set a Goal (£) above 0, then click Solve."
         return msg, msg
@@ -1113,7 +1068,10 @@ def solve_monthly(
 
     default_params = SCENARIOS[scenario]
 
+    calibration_note = ""
+
     def get_r_vol():
+        nonlocal calibration_note
         if not use_data:
             return default_params["r"], default_params["vol"]
         try:
@@ -1123,22 +1081,20 @@ def solve_monthly(
             vol = float(np.clip(vol, 0.05, 0.60))
             return mu, vol
         except Exception:
+            calibration_note = "Calibration failed; using preset assumptions. "
             return default_params["r"], default_params["vol"]
 
     r, v = get_r_vol()
     r_net = max(-0.50, r - fee_pct)
 
-    lo, hi = 0.0, 5000.0
     sims_solver = 900
-    iters = 12
 
-    for _ in range(iters):
-        mid = (lo + hi) / 2.0
+    def probability(monthly):
 
         paths = simulate(
             years=years,
             start_balance=1000,
-            monthly_contribution=mid,
+            monthly_contribution=monthly,
             expected_return_annual=r_net,
             volatility_annual=v,
             inflation_annual=INFLATION_ANNUAL,
@@ -1148,15 +1104,13 @@ def solve_monthly(
         if crash_enabled:
             paths = apply_crash(paths, crash_pct=crash_pct, seed=2001)
 
-        p = prob_reach_goal(paths[:, -1], goal)
+        return prob_reach_goal(paths[:, -1], goal)
 
-        if p >= target:
-            hi = mid
-        else:
-            lo = mid
-
-    recommended = round(hi / 10) * 10
-    msg = f"To reach {money(goal)} with ~{int(target_prob)}% probability, save about {money(recommended)}/month (under current settings)."
+    recommended = required_monthly(probability, target)
+    if recommended is None:
+        msg = calibration_note + "Target not reached within the £5,000/month search limit under current settings."
+        return msg, msg
+    msg = calibration_note + f"To reach {money(goal)} with ~{int(target_prob)}% probability, save about {money(recommended)}/month (under current settings)."
     return msg, msg
 
 
@@ -1385,6 +1339,8 @@ def sequence_paths(
     Input("seq-start", "value"),
 )
 def update_sequence_demo(years, monthly, avg_pct, vol_pct, seed, start):
+    if any(value is None for value in (years, monthly, avg_pct, vol_pct)):
+        raise PreventUpdate
     years = int(years)
     monthly = float(monthly)
     avg = float(avg_pct) / 100.0
@@ -1422,4 +1378,4 @@ def update_sequence_demo(years, monthly, avg_pct, vol_pct, seed, start):
 # -------------------- Main --------------------
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=False)

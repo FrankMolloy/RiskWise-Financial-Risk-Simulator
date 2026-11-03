@@ -1,4 +1,5 @@
 import numpy as np
+from numbers import Integral
 
 class MonteCarloSimulator:
     def __init__(
@@ -12,6 +13,18 @@ class MonteCarloSimulator:
         simulations: int = 1000,
         seed: int = 42
     ):
+        if isinstance(years, bool) or not isinstance(years, Integral) or years < 0:
+            raise ValueError("years must be a non-negative integer")
+        if isinstance(simulations, bool) or not isinstance(simulations, Integral) or simulations < 1:
+            raise ValueError("simulations must be a positive integer")
+        values = (start_balance, monthly_contribution, expected_return_annual,
+                  volatility_annual, inflation_annual)
+        if not all(np.isfinite(value) for value in values):
+            raise ValueError("simulation parameters must be finite")
+        if start_balance < 0 or monthly_contribution < 0 or volatility_annual < 0:
+            raise ValueError("balances, contributions and volatility must be non-negative")
+        if inflation_annual <= -1:
+            raise ValueError("inflation_annual must be greater than -1")
         self.years = years
         self.start_balance = start_balance
         self.monthly_contribution = monthly_contribution
@@ -21,8 +34,13 @@ class MonteCarloSimulator:
         self.simulations = simulations
         self.seed = seed
 
-    def run(self):
-        np.random.seed(self.seed)
+    def run(self) -> np.ndarray:
+        """Return real balances shaped (simulations, 12 * years + 1).
+
+        Contributions are fixed nominal amounts paid after each month's return.
+        A local legacy RNG preserves seeded results without changing global state.
+        """
+        rng = np.random.RandomState(self.seed)
 
         months = self.years * 12
 
@@ -31,7 +49,7 @@ class MonteCarloSimulator:
         monthly_volatility = self.volatility_annual / np.sqrt(12)
 
         # Generate random monthly returns
-        random_returns = np.random.normal(
+        random_returns = rng.normal(
             mean_monthly_return,
             monthly_volatility,
             (self.simulations, months)
@@ -65,7 +83,7 @@ def simulate(
     inflation_annual: float,
     simulations: int = 3000,
     seed: int = 42
-):
+) -> np.ndarray:
     sim = MonteCarloSimulator(
         years=years,
         start_balance=start_balance,

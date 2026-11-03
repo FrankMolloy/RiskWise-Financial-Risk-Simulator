@@ -56,6 +56,8 @@ def estimate_annual_return_vol(close: pd.Series) -> Tuple[float, float]:
 
     Returns: (mu_annual, sigma_annual)
     """
+    if len(close) < 3 or not np.isfinite(close.to_numpy(dtype=float)).all() or (close <= 0).any():
+        raise ValueError("At least three finite, positive closing prices are required")
     rets = np.log(close / close.shift(1)).dropna()
 
     mu_daily = rets.mean()

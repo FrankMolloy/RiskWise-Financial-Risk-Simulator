@@ -1,78 +1,64 @@
-🚀 RiskWise — Financial Risk Simulator (Monte Carlo)
+# RiskWise
 
-Live Demo: https://riskwise-v04j.onrender.com
+Monte Carlo investment simulator built with **Python, NumPy, Dash and Plotly** for Hackonomics 2026. Explore how contributions, volatility, fees and inflation affect a distribution of investment outcomes.
 
-Built for Hackonomics 2026
+**[Live demo](https://riskwise-v04j.onrender.com/)** — checked 3 November 2026: dashboard and charts rendered successfully. Render may show a wake-up page on first visit.
 
-What It Does
+## Features
 
-RiskWise is a cloud-deployed financial risk simulator that models long-term investment outcomes under uncertainty.
+- 1,000 / 2,000 / 5,000 simulated paths; P10 / median / P90 and goal probability.
+- Scenario comparison, illustrative crash stress, fee drag and return sensitivity.
+- Bounded monthly-saving solver, sequence-of-returns demo, browser-local plan snapshots and JSON export.
+- Optional SPY / QQQ / IWM historical calibration from Stooq, with preset fallback.
 
-Instead of showing a single forecast, it runs 1,000–5,000 Monte Carlo simulations per scenario to visualise a distribution of possible outcomes.
+<details>
+<summary>Application screenshot — local build, genuine default scenario</summary>
 
-It helps users:
+![RiskWise dashboard](docs/screenshots/dashboard.png)
 
-Understand downside and upside risk
+[Sequence-of-returns demo screenshot](docs/screenshots/sequence-demo.png)
 
-Estimate probability of reaching financial goals
+</details>
 
-Compare strategies under volatility
+## Architecture
 
-Why It Matters
+```mermaid
+flowchart LR
+    Browser[Dash UI / Plotly] <-->|callbacks over HTTP| App[Dash / Flask · app.py]
+    Browser <--> Storage[Browser localStorage · plans]
+    App --> Engine[simulator.py · NumPy paths]
+    App --> Analysis[metrics.py / projections.py]
+    App --> Planner[planning.py · bounded search]
+    App --> Data[market_data.py · process-local cache]
+    Data --> Stooq[Stooq CSV · optional]
+```
 
-Traditional financial tools show one projected number.
+One WSGI application served by Gunicorn; no separate REST API, database or account system.
 
-RiskWise demonstrates why that is misleading — by modelling volatility, tail risk, and sequence-of-returns effects using stochastic simulation.
+## Run and test
 
-The aim is educational: to promote probabilistic thinking in financial decision-making.
+Requires **Python 3.12**. From a clone of this repository:
 
-Core Features
+```bash
+python -m venv .venv
+# Activate: Windows PowerShell .\.venv\Scripts\Activate.ps1
+# macOS/Linux: source .venv/bin/activate
+python -m pip install -r requirements.txt
+python SRC/app.py
+```
 
-Monte Carlo simulation engine (2,000–5,000 runs)
+Open `http://127.0.0.1:8050`. Tests use standard-library unittest:
 
-Percentile bands (P10 / P50 / P90)
+```bash
+# PowerShell: $env:PYTHONPATH="SRC"
+# macOS/Linux: export PYTHONPATH=SRC
+python -m unittest discover -s tests -v
+```
 
-Goal probability modelling
+The [CI workflow](.github/workflows/ci.yml) runs tests, dependency checks and a Linux Gunicorn smoke test once pushed. [Setup and deployment details](docs/DEVELOPMENT.md).
 
-Binary search solver for required monthly contribution
+## Model and limitations
 
-Stress testing (crash scenarios + fee drag)
+Independent normal monthly **simple returns**, fixed nominal contributions after growth, and 2% annual inflation. Percentiles describe simulated outcomes, not confidence intervals or guarantees. Historical log-return calibration is an approximation; Stooq returned HTTP 404 at the final check, so presets were used. Crash stress also scales later contributions. No taxes, asset correlations or fat-tail model. Educational use only.
 
-Interactive Dash + Plotly dashboard
-
-Save & compare financial plans
-
-Methodology (Brief Technical Summary)
-
-Simulates monthly returns using stochastic modelling
-
-Optional calibration from historical ETF log returns (annualised, 252-day convention)
-
-Inflation-adjusted (real terms) projections
-
-Percentile distribution analysis
-
-Tech Stack
-
-Python, NumPy, pandas
-Dash + Plotly
-Gunicorn (WSGI)
-Render (cloud deployment)
-GitHub CI/CD
-
-Architecture
-
-User Input → Simulation Engine → Statistical Analysis → Visualisation → Insight Generation → Plan Storage
-
-Limitations
-
-Educational tool — not financial advice.
-Simplified stochastic assumptions.
-
-Author
-
-Frank Molloy
-
-GitHub: https://github.com/FrankMolloy
-
-LinkedIn: http://www.linkedin.com/in/frankunderwoodmolloy
+[Exact methodology](docs/METHODOLOGY.md) · [Audit and validation](docs/AUDIT.md)
